@@ -1,3 +1,7 @@
+import { signOut } from "firebase/auth";
+import { auth } from "./firebase";
+import ResponderPortal from "./pages/ResponderPortal";
+import AdminDashboard from "./pages/AdminDashboard";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
@@ -107,6 +111,20 @@ function timeAgo(ts) {
 }
 
 function App({ role }) {
+    async function handleLogout() {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  }
+    if (role === "responder") {
+    return <ResponderPortal />;
+  }
+
+  if (role === "admin") {
+    return <AdminDashboard />;
+  }
   const [page, setPage] = useState("home");
   const [incidents, setIncidents] = useState(loadIncidents);
   const [selected, setSelected] = useState(null);
@@ -176,6 +194,7 @@ function App({ role }) {
               Responder
             </button>
           )}
+          <button className="secondary" onClick={handleLogout}>Sign out</button>
         </nav>
         
         <button className="menuBtn" onClick={()=>setMenu(!menu)}>{menu ? <X/> : <Menu/>}</button>
