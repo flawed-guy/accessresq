@@ -1,3 +1,8 @@
+import ReactDOM from "react-dom/client";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./auth/AuthContext";
+import Login from "./pages/Login";
+import ProtectedRoute from "./auth/ProtectedRoute";
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -101,8 +106,7 @@ function timeAgo(ts) {
   return `${mins} min ago`;
 }
 
-function App() {
-  const [role, setRole] = useState("student");
+function App({ role }) {
   const [page, setPage] = useState("home");
   const [incidents, setIncidents] = useState(loadIncidents);
   const [selected, setSelected] = useState(null);
@@ -161,12 +165,19 @@ function App() {
           <button className={page==="home" ? "navActive" : ""} onClick={() => {setPage("home");setMenu(false)}}>Home</button>
           <button className={page==="map" ? "navActive" : ""} onClick={() => {setPage("map");setMenu(false)}}>Campus Map</button>
           <button className={page==="status" ? "navActive" : ""} onClick={() => {setPage("status");setMenu(false)}}>My Emergency</button>
-          <button className={page==="dashboard" ? "navActive" : ""} onClick={() => {setRole("responder");setPage("dashboard");setMenu(false)}}>Responder</button>
+          {role === "responder" && (
+            <button
+              className={page === "dashboard" ? "navActive" : ""}
+              onClick={() => {
+                setPage("dashboard");
+                setMenu(false);
+              }}
+            >
+              Responder
+            </button>
+          )}
         </nav>
-        <div className="roleSwitch">
-          <button className={role==="student" ? "selectedRole":""} onClick={()=>setRole("student")}>Student</button>
-          <button className={role==="responder" ? "selectedRole":""} onClick={()=>setRole("responder")}>Responder</button>
-        </div>
+        
         <button className="menuBtn" onClick={()=>setMenu(!menu)}>{menu ? <X/> : <Menu/>}</button>
       </header>
 
@@ -175,8 +186,17 @@ function App() {
         {page === "report" && <Report onBack={()=>setPage("home")} onSubmit={createIncident}/>}
         {page === "status" && <Status incident={selectedIncident} onBack={()=>setPage("home")} onMap={()=>setPage("map")} />}
         {page === "map" && <CampusMap incidents={active} route={route} onRoute={setRoute} />}
-        {page === "dashboard" && <ResponderDashboard incidents={active} onSelect={(id)=>{setSelected(id);setPage("incident")}} onReset={resetDemo}/>}
-        {page === "incident" && selectedIncident && <IncidentDetail incident={selectedIncident} route={route} setRoute={setRoute} updateIncident={updateIncident} onBack={()=>setPage("dashboard")}/>}
+        {page === "dashboard" && role === "responder" && (
+          <ResponderDashboard
+            incidents={active}
+            onSelect={(id) => {
+              setSelected(id);
+              setPage("incident");
+            }}
+            onReset={resetDemo}
+          />
+        )}
+        {page === "incident" && role === "responder" && selectedIncident && <IncidentDetail incident={selectedIncident} route={route} setRoute={setRoute} updateIncident={updateIncident} onBack={()=>setPage("dashboard")}/>}
       </main>
 
       <footer>
@@ -383,5 +403,49 @@ function IncidentDetail({incident,route,setRoute,updateIncident,onBack}) {
     </div>
   </div>
 }
+function RoleRouter() {
+  const { user, role, loading } = useAuth();
 
-createRoot(document.getElementById("root")).render(<App />);
+  if (loading) {
+    return (
+      <div className="container">
+        <h2>Loading AccessResQ...</h2>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!role) {
+    return (
+      <div className="container">
+        <h2>Account role not configured.</h2>
+      </div>
+    );
+  }
+
+  return <App role={role} />;
+}
+
+createRoot(document.getElementById("root")).render(
+  <BrowserRouter>
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute
+              allowedRoles={["student", "responder", "admin"]}
+            >
+              <RoleRouter />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </AuthProvider>
+  </BrowserRouter>
+);
